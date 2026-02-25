@@ -1,0 +1,12 @@
+{
+  "name": "face-needling-web",
+  "version": "1.0.0",
+  "description": "Face Needling — Nairobi's Microneedling Specialists website",
+  "scripts": {
+    "dev": "npx serve . --listen 3000 --no-clipboard",
+    "start": "npx serve . --listen 3000"
+  },
+  "keywords": ["microneedling", "nairobi", "skincare"],
+  "author": "Face Needling",
+  "license": "UNLICENSED"
+}
