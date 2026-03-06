@@ -1,245 +1,494 @@
-/* ==========================================================
-   FACE NEEDLING — MAIN JAVASCRIPT
-   ========================================================== */
-
 (function () {
-  'use strict';
+  "use strict";
 
-  /* ----------------------------------------------------------
-     1. HERO SLIDER
-     ---------------------------------------------------------- */
-  var slides   = document.querySelectorAll('.slide');
-  var dots     = document.querySelectorAll('.slider-dot');
-  var progress = document.getElementById('sp');
-  var slider   = document.querySelector('.hero-slider');
+  var navbar = document.getElementById("navbar");
+  var navHamburger = document.getElementById("navHamburger");
+  var mobileMenu = document.getElementById("mobileMenu");
 
-  var current  = 0;
-  var timer    = null;
-  var interval = null;
-  var pVal     = 0;
-  var DURATION = 6000;
-  var touchStartX = 0;
+  window.addEventListener("scroll", function () {
+    if (navbar) {
+      navbar.classList.toggle("scrolled", window.scrollY > 10);
+    }
+  });
 
-  function goToSlide(index) {
-    slides[current].classList.remove('active');
-    dots[current].classList.remove('active');
-    current = (index + slides.length) % slides.length;
-    slides[current].classList.add('active');
-    dots[current].classList.add('active');
-    resetProgress();
-  }
-
-  function nextSlide() { goToSlide(current + 1); }
-  function prevSlide()  { goToSlide(current - 1); }
-
-  function resetProgress() {
-    clearTimeout(timer);
-    clearInterval(interval);
-    pVal = 0;
-    if (progress) progress.style.width = '0%';
-    interval = setInterval(function () {
-      pVal += 100 / (DURATION / 50);
-      if (progress) progress.style.width = Math.min(pVal, 100) + '%';
-    }, 50);
-    timer = setTimeout(nextSlide, DURATION);
-  }
-
-  // Pause on hover
-  if (slider) {
-    slider.addEventListener('mouseenter', function () {
-      clearTimeout(timer);
-      clearInterval(interval);
+  if (navHamburger && mobileMenu) {
+    navHamburger.addEventListener("click", function () {
+      var opened = mobileMenu.classList.toggle("open");
+      navHamburger.setAttribute("aria-expanded", String(opened));
     });
-    slider.addEventListener('mouseleave', resetProgress);
 
-    // Swipe support
-    slider.addEventListener('touchstart', function (e) {
-      touchStartX = e.touches[0].clientX;
-    }, { passive: true });
-    slider.addEventListener('touchend', function (e) {
-      var delta = touchStartX - e.changedTouches[0].clientX;
-      if (Math.abs(delta) > 50) {
-        delta > 0 ? nextSlide() : prevSlide();
+    mobileMenu.querySelectorAll("a").forEach(function (item) {
+      item.addEventListener("click", function () {
+        mobileMenu.classList.remove("open");
+        navHamburger.setAttribute("aria-expanded", "false");
+      });
+    });
+  }
+
+  // Mega-menu helper
+  function makeMegaMenu(triggerId, menuId, navItemId) {
+    var trigger = document.getElementById(triggerId);
+    var menu = document.getElementById(menuId);
+    var navItem = document.getElementById(navItemId);
+    if (!trigger || !menu) return null;
+    return { trigger: trigger, menu: menu, navItem: navItem };
+  }
+
+  function positionMenu(menu) {
+    if (navbar && menu) {
+      menu.style.top = navbar.getBoundingClientRect().bottom + "px";
+    }
+  }
+
+  function closeMenu(m) {
+    if (!m) return;
+    m.menu.classList.remove("open");
+    m.menu.setAttribute("aria-hidden", "true");
+    m.trigger.setAttribute("aria-expanded", "false");
+  }
+
+  var treatmentsM = makeMegaMenu("treatmentsTrigger", "treatmentsMegaMenu", "treatmentsNavItem");
+  var serumM = makeMegaMenu("serumTrigger", "serumMegaMenu", "serumNavItem");
+
+  function closeAll() {
+    closeMenu(treatmentsM);
+    closeMenu(serumM);
+  }
+
+  function openMenu(m) {
+    if (!m) return;
+    positionMenu(m.menu);
+    m.menu.classList.add("open");
+    m.menu.setAttribute("aria-hidden", "false");
+    m.trigger.setAttribute("aria-expanded", "true");
+  }
+
+  function initMegaMenu(m, allMenus) {
+    if (!m) return;
+    var closeTimer;
+
+    function scheduleClose() {
+      closeTimer = setTimeout(function () { closeMenu(m); }, 120);
+    }
+    function cancelClose() {
+      clearTimeout(closeTimer);
+    }
+
+    // Hover on nav item
+    m.navItem.addEventListener("mouseenter", function () {
+      cancelClose();
+      allMenus.forEach(function (x) { if (x !== m) closeMenu(x); });
+      openMenu(m);
+    });
+    m.navItem.addEventListener("mouseleave", scheduleClose);
+
+    // Keep open while hovering the panel itself
+    m.menu.addEventListener("mouseenter", cancelClose);
+    m.menu.addEventListener("mouseleave", scheduleClose);
+
+    // Click navigates to the page (hover already handles menu open/close)
+    // No preventDefault — follow the href directly
+  }
+
+  var allMenus = [treatmentsM, serumM];
+  allMenus.forEach(function (m) { initMegaMenu(m, allMenus); });
+
+  document.addEventListener("click", function (e) {
+    allMenus.forEach(function (m) {
+      if (!m) return;
+      if (m.navItem && !m.navItem.contains(e.target) && !m.menu.contains(e.target)) {
+        closeMenu(m);
       }
     });
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeAll();
+  });
+
+  window.addEventListener("scroll", function () {
+    allMenus.forEach(function (m) {
+      if (m && m.menu.classList.contains("open")) positionMenu(m.menu);
+    });
+  });
+
+  window.addEventListener("resize", function () {
+    allMenus.forEach(function (m) {
+      if (m && m.menu.classList.contains("open")) positionMenu(m.menu);
+    });
+  });
+
+  // Concern links: store filter in sessionStorage for treatments.html
+  if (treatmentsM) {
+    treatmentsM.menu.querySelectorAll(".mega-concern-link").forEach(function (link) {
+      link.addEventListener("click", function () {
+        var concern = link.getAttribute("data-filter-concern");
+        if (concern) sessionStorage.setItem("pendingConcernFilter", concern);
+        closeMenu(treatmentsM);
+      });
+    });
   }
 
-  // Keyboard navigation
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowRight') nextSlide();
-    if (e.key === 'ArrowLeft')  prevSlide();
-  });
+  // Hero slider
+  var slides = document.querySelectorAll(".hero-slide");
+  var dots = document.querySelectorAll(".slider-dot");
+  var prev = document.getElementById("prevSlide");
+  var next = document.getElementById("nextSlide");
+  var current = 0;
+  var timer;
 
-  // Expose to inline HTML onclick handlers
-  window.goToSlide = goToSlide;
-  window.nextSlide = nextSlide;
-  window.prevSlide = prevSlide;
-
-  // Start
-  resetProgress();
-
-
-  /* ----------------------------------------------------------
-     2. NAVBAR — scroll shadow + mobile hamburger
-     ---------------------------------------------------------- */
-  var navbar     = document.getElementById('navbar');
-  var hamburger  = document.getElementById('navHamburger');
-  var mobileMenu = document.getElementById('mobileMenu');
-
-  window.addEventListener('scroll', function () {
-    if (navbar) navbar.classList.toggle('scrolled', window.scrollY > 10);
-  });
-
-  if (hamburger && mobileMenu) {
-    hamburger.addEventListener('click', function () {
-      var isOpen = mobileMenu.classList.toggle('open');
-      hamburger.classList.toggle('open', isOpen);
-      hamburger.setAttribute('aria-expanded', isOpen);
+  function renderSlide(index) {
+    slides.forEach(function (slide, idx) {
+      slide.classList.toggle("active", idx === index);
     });
+    dots.forEach(function (dot, idx) {
+      dot.classList.toggle("active", idx === index);
+    });
+    current = index;
+  }
 
-    // Close when a link is clicked
-    mobileMenu.querySelectorAll('a').forEach(function (link) {
-      link.addEventListener('click', function () {
-        mobileMenu.classList.remove('open');
-        hamburger.classList.remove('open');
-        hamburger.setAttribute('aria-expanded', false);
+  function goToSlide(index) {
+    var normalized = (index + slides.length) % slides.length;
+    renderSlide(normalized);
+    restartAutoSlide();
+  }
+
+  function restartAutoSlide() {
+    clearInterval(timer);
+    timer = setInterval(function () {
+      goToSlide(current + 1);
+    }, 6000);
+  }
+
+  if (slides.length > 0) {
+    dots.forEach(function (dot) {
+      dot.addEventListener("click", function () {
+        var idx = Number(dot.getAttribute("data-slide"));
+        goToSlide(idx);
       });
     });
 
-    // Close on outside click
-    document.addEventListener('click', function (e) {
-      if (!navbar.contains(e.target) && !mobileMenu.contains(e.target)) {
-        mobileMenu.classList.remove('open');
-        hamburger.classList.remove('open');
-        hamburger.setAttribute('aria-expanded', false);
-      }
-    });
+    if (prev) {
+      prev.addEventListener("click", function () {
+        goToSlide(current - 1);
+      });
+    }
+
+    if (next) {
+      next.addEventListener("click", function () {
+        goToSlide(current + 1);
+      });
+    }
+
+    // Show first slide instantly (no transition), then enable transitions
+    renderSlide(0);
+    var heroSlider = document.querySelector(".hero-slider");
+    setTimeout(function () {
+      if (heroSlider) heroSlider.classList.add("is-loaded");
+      restartAutoSlide();
+    }, 50);
   }
 
+  // Hash navigation: jump instantly to anchor on page load
+  // (avoids the browser smooth-scrolling past the hero on cross-page nav)
+  if (window.location.hash) {
+    var target = document.querySelector(window.location.hash);
+    if (target) {
+      document.documentElement.style.scrollBehavior = "auto";
+      target.scrollIntoView();
+      setTimeout(function () {
+        document.documentElement.style.scrollBehavior = "";
+      }, 100);
+    }
+  }
 
-  /* ----------------------------------------------------------
-     3. SCROLL REVEAL
-     ---------------------------------------------------------- */
+  // Scroll reveal
   var revealObserver = new IntersectionObserver(function (entries) {
     entries.forEach(function (entry) {
       if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
+        entry.target.classList.add("visible");
         revealObserver.unobserve(entry.target);
       }
     });
-  }, { threshold: 0.1 });
+  }, { threshold: 0.14 });
 
-  document.querySelectorAll('.reveal').forEach(function (el) {
+  document.querySelectorAll(".reveal").forEach(function (el) {
     revealObserver.observe(el);
   });
 
+  // Checkbox multi-filter
+  var filterChecks = document.querySelectorAll(".filter-check");
+  var serviceCards = document.querySelectorAll(".services-grid-all .service-card");
+  var filterResultsCount = document.getElementById("filterResultsCount");
 
-  /* ----------------------------------------------------------
-     4. PRODUCT CATEGORY FILTER
-     ---------------------------------------------------------- */
-  var filterBtns = document.querySelectorAll('.shop-cat-btn');
-  var prodCards  = document.querySelectorAll('.prod-card');
+  function getSelectedValues(group) {
+    var values = [];
+    filterChecks.forEach(function (check) {
+      if (check.getAttribute("data-group") === group && check.checked) {
+        values.push(check.getAttribute("data-value"));
+      }
+    });
+    return values;
+  }
 
-  filterBtns.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      // Update active button
-      filterBtns.forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
+  function applyCheckboxFilters() {
+    var selectedTypes = getSelectedValues("type");
+    var selectedConcerns = getSelectedValues("concern");
 
-      var cat = btn.getAttribute('data-cat');
+    var typeAll = selectedTypes.indexOf("all") !== -1;
+    var concernAll = selectedConcerns.indexOf("all") !== -1;
 
-      // Show / hide cards
-      prodCards.forEach(function (card) {
-        if (cat === 'all' || card.getAttribute('data-cat') === cat) {
-          card.classList.remove('hidden');
-          // Tiny re-entrance animation
-          card.style.animation = 'none';
-          card.offsetHeight; // reflow
-          card.style.animation = '';
-        } else {
-          card.classList.add('hidden');
+    var visible = 0;
+    serviceCards.forEach(function (card) {
+      var typeTags = (card.getAttribute("data-type") || "").split(" ");
+      var concernTags = (card.getAttribute("data-concern") || "").split(" ");
+
+      var typeMatch = typeAll || selectedTypes.some(function (t) {
+        return typeTags.indexOf(t) !== -1;
+      });
+      var concernMatch = concernAll || selectedConcerns.some(function (c) {
+        return concernTags.indexOf(c) !== -1;
+      });
+
+      var show = typeMatch && concernMatch;
+      card.classList.toggle("hidden", !show);
+      if (show) visible++;
+    });
+
+    if (filterResultsCount) {
+      filterResultsCount.innerHTML =
+        "<strong>" + visible + "</strong> treatment" + (visible !== 1 ? "s" : "");
+    }
+  }
+
+  function syncCheckboxGroup(group, changedCheck) {
+    var value = changedCheck.getAttribute("data-value");
+    var isChecked = changedCheck.checked;
+
+    if (value === "all" && isChecked) {
+      // Uncheck all specific options in this group
+      filterChecks.forEach(function (c) {
+        if (c.getAttribute("data-group") === group && c.getAttribute("data-value") !== "all") {
+          c.checked = false;
         }
       });
+    } else if (value !== "all") {
+      if (isChecked) {
+        // Uncheck the "all" option for this group
+        filterChecks.forEach(function (c) {
+          if (c.getAttribute("data-group") === group && c.getAttribute("data-value") === "all") {
+            c.checked = false;
+          }
+        });
+      }
+      // If nothing specific is checked, restore "all"
+      var anySpecificChecked = false;
+      filterChecks.forEach(function (c) {
+        if (c.getAttribute("data-group") === group && c.getAttribute("data-value") !== "all" && c.checked) {
+          anySpecificChecked = true;
+        }
+      });
+      if (!anySpecificChecked) {
+        filterChecks.forEach(function (c) {
+          if (c.getAttribute("data-group") === group && c.getAttribute("data-value") === "all") {
+            c.checked = true;
+          }
+        });
+      }
+    }
+  }
+
+  // ── Before/After comparison sliders (results.html) ──────
+  var baSliders = document.querySelectorAll(".ba-slider");
+
+  baSliders.forEach(function (slider) {
+    var before = slider.querySelector(".ba-before");
+    var handle = slider.querySelector(".ba-handle");
+    var active = false;
+
+    function moveTo(clientX) {
+      var rect = slider.getBoundingClientRect();
+      var pct = ((clientX - rect.left) / rect.width) * 100;
+      pct = Math.max(2, Math.min(98, pct));
+      before.style.clipPath = "inset(0 " + (100 - pct) + "% 0 0)";
+      handle.style.left = pct + "%";
+    }
+
+    // Click anywhere on slider to jump position
+    slider.addEventListener("click", function (e) {
+      moveTo(e.clientX);
+    });
+
+    // Drag handle
+    handle.addEventListener("mousedown", function (e) {
+      active = true;
+      e.preventDefault();
+    });
+    document.addEventListener("mousemove", function (e) {
+      if (active) moveTo(e.clientX);
+    });
+    document.addEventListener("mouseup", function () {
+      active = false;
+    });
+
+    // Touch support
+    handle.addEventListener("touchstart", function () {
+      active = true;
+    }, { passive: true });
+    document.addEventListener("touchmove", function (e) {
+      if (active) {
+        moveTo(e.touches[0].clientX);
+        e.preventDefault();
+      }
+    }, { passive: false });
+    document.addEventListener("touchend", function () {
+      active = false;
     });
   });
 
+  // ── Results filter pills (results.html) ──────────────────
+  var rpFilters = document.querySelectorAll(".rp-filter");
+  var rpCards = document.querySelectorAll(".ba-card");
 
-  /* ----------------------------------------------------------
-     5. CONTACT FORM — validation + submission feedback
-     ---------------------------------------------------------- */
-  var contactForm = document.getElementById('contactForm');
+  if (rpFilters.length > 0 && rpCards.length > 0) {
+    rpFilters.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var filter = btn.getAttribute("data-filter");
 
-  if (contactForm) {
-    contactForm.addEventListener('submit', function (e) {
-      e.preventDefault();
+        rpFilters.forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
 
-      var nameEl    = document.getElementById('cf-name');
-      var emailEl   = document.getElementById('cf-email');
-      var phoneEl   = document.getElementById('cf-phone');
-      var serviceEl = document.getElementById('cf-service');
-      var msgEl     = document.getElementById('cf-message');
-      var formMsg   = document.getElementById('formMsg');
-
-      // Clear previous errors
-      [nameEl, emailEl, phoneEl, serviceEl, msgEl].forEach(function (el) {
-        if (el) el.classList.remove('error');
+        rpCards.forEach(function (card) {
+          var concerns = card.getAttribute("data-concern") || "";
+          var show = filter === "all" || concerns.indexOf(filter) !== -1;
+          card.classList.toggle("rp-hidden", !show);
+        });
       });
-      if (formMsg) { formMsg.className = 'form-msg'; formMsg.textContent = ''; }
-
-      var valid = true;
-
-      function flagError(el) {
-        if (el) { el.classList.add('error'); valid = false; }
-      }
-
-      if (!nameEl || nameEl.value.trim() === '')          flagError(nameEl);
-      if (!emailEl || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim())) flagError(emailEl);
-      if (!phoneEl || phoneEl.value.trim() === '')        flagError(phoneEl);
-      if (!serviceEl || serviceEl.value === '')           flagError(serviceEl);
-
-      if (!valid) {
-        if (formMsg) {
-          formMsg.className = 'form-msg error-msg';
-          formMsg.textContent = 'Please fill in all required fields correctly.';
-        }
-        return;
-      }
-
-      // Simulate submission (replace with real fetch/endpoint later)
-      var submitBtn = contactForm.querySelector('button[type="submit"]');
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Sending…';
-      }
-
-      setTimeout(function () {
-        if (formMsg) {
-          formMsg.className = 'form-msg success';
-          formMsg.textContent = 'Thank you! We will be in touch within 24 hours.';
-        }
-        contactForm.reset();
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Send Message';
-        }
-      }, 1200);
     });
   }
 
+  // ── Shop product filter (shop.html) ──────────────────────
+  var spFilters = document.querySelectorAll(".sp-filter");
+  var productCards = document.querySelectorAll(".product-card");
+  var spCount = document.getElementById("spCount");
 
-  /* ----------------------------------------------------------
-     6. SMOOTH SCROLL for anchor links
-     ---------------------------------------------------------- */
-  document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
-    anchor.addEventListener('click', function (e) {
-      var target = document.querySelector(anchor.getAttribute('href'));
-      if (target) {
-        e.preventDefault();
-        var offset = navbar ? navbar.offsetHeight : 0;
-        var top = target.getBoundingClientRect().top + window.scrollY - offset;
-        window.scrollTo({ top: top, behavior: 'smooth' });
-      }
+  function applySpFilter(filter) {
+    spFilters.forEach(function (b) { b.classList.remove("active"); });
+    var matchBtn = document.querySelector('.sp-filter[data-filter="' + filter + '"]');
+    if (matchBtn) matchBtn.classList.add("active");
+    else if (spFilters[0]) spFilters[0].classList.add("active");
+
+    var visible = 0;
+    productCards.forEach(function (card) {
+      var cardFilter = card.getAttribute("data-filter") || "";
+      var show = filter === "all" || cardFilter === filter;
+      card.classList.toggle("sp-hidden", !show);
+      if (show) visible++;
     });
+    if (spCount) spCount.textContent = String(visible);
+  }
+
+  if (spFilters.length > 0 && productCards.length > 0) {
+    spFilters.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        applySpFilter(btn.getAttribute("data-filter"));
+      });
+    });
+
+    // Deep-link support: shop.html#ageing etc.
+    var hashFilter = window.location.hash.replace("#", "");
+    if (hashFilter) applySpFilter(hashFilter);
+  }
+
+  if (filterChecks.length > 0 && serviceCards.length > 0) {
+    // Check for pending concern filter from mega-menu navigation
+    var pendingConcern = sessionStorage.getItem("pendingConcernFilter");
+    if (pendingConcern) {
+      sessionStorage.removeItem("pendingConcernFilter");
+      filterChecks.forEach(function (check) {
+        if (check.getAttribute("data-group") === "concern") {
+          if (check.getAttribute("data-value") === pendingConcern) {
+            check.checked = true;
+          } else if (check.getAttribute("data-value") === "all") {
+            check.checked = false;
+          }
+        }
+      });
+      applyCheckboxFilters();
+    }
+
+    filterChecks.forEach(function (check) {
+      check.addEventListener("change", function () {
+        var group = check.getAttribute("data-group");
+        syncCheckboxGroup(group, check);
+        applyCheckboxFilters();
+      });
+    });
+  }
+})();
+
+// ── BOOKING FORM ──────────────────────────────────────────────
+(function () {
+  const form = document.getElementById('bookingForm');
+  if (!form) return;
+
+  // Set minimum date to tomorrow
+  const dateInput = form.querySelector('#bf-date');
+  if (dateInput) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    dateInput.min = tomorrow.toISOString().split('T')[0];
+  }
+
+  // Pre-fill treatment from data-treatment attribute
+  const preset = form.dataset.treatment;
+  if (preset) {
+    const sel = form.querySelector('#bf-treatment');
+    if (sel) {
+      for (const opt of sel.options) {
+        if (opt.value === preset) { opt.selected = true; break; }
+      }
+    }
+  }
+
+  // Clear error highlight on input
+  form.querySelectorAll('[required]').forEach(function (el) {
+    el.addEventListener('input', function () { el.classList.remove('bf-error'); });
+    el.addEventListener('change', function () { el.classList.remove('bf-error'); });
   });
 
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const name      = form.querySelector('#bf-name').value.trim();
+    const phone     = form.querySelector('#bf-phone').value.trim();
+    const treatment = form.querySelector('#bf-treatment').value;
+    const date      = form.querySelector('#bf-date').value;
+    const time      = form.querySelector('#bf-time').value;
+    const notes     = form.querySelector('#bf-notes').value.trim();
+
+    // Validate required fields
+    let valid = true;
+    form.querySelectorAll('[required]').forEach(function (el) {
+      if (!el.value.trim()) { el.classList.add('bf-error'); valid = false; }
+    });
+    if (!valid) return;
+
+    // Format date
+    const dateObj = new Date(date + 'T00:00:00');
+    const dateFormatted = dateObj.toLocaleDateString('en-KE', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+
+    // Build WhatsApp message
+    let msg = 'Hi, I\'d like to book an appointment at Face Needling.\n\n';
+    msg += '*Name:* ' + name + '\n';
+    msg += '*Phone:* ' + phone + '\n';
+    msg += '*Treatment:* ' + treatment + '\n';
+    msg += '*Date:* ' + dateFormatted + '\n';
+    msg += '*Time:* ' + time;
+    if (notes) msg += '\n*Notes:* ' + notes;
+
+    window.open('https://wa.me/254706590440?text=' + encodeURIComponent(msg), '_blank');
+  });
 })();
